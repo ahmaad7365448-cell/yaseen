@@ -52,6 +52,10 @@ export interface Translations {
   selectDateFirst: string;
   slotBooked: string;
   slotAvailable: string;
+  slotBookedAllDepts: string;
+  slotPassed: string;
+  unifiedBookingNotice: string;
+  lockedAllDeptsTooltip: string;
 
   // Step 3: Patient Info
   patientInfoHeading: string;
@@ -132,7 +136,7 @@ export const translations: Record<Language, Translations> = {
     chooseDateSub: 'اختر يوماً مناسباً من التقويم التفاعلي (المواعيد متاحة للأيام القادمة)',
     chooseTimeHeading: 'حدد التوقيت المفضل',
     chooseTimeSub: 'أوقات العمل المعتمدة للقسم المختار من 11:00 صباحاً حتى 11:00 مساءً',
-    timeSlotNotice: 'تتم جدولة أوقات المواعيد لكل تخصص بشكل مستقل وفق جاهزية العيادة والأجهزة',
+    timeSlotNotice: 'نظام الحجز الموحد: الموعد المحجوز يُقفل فوراً لجميع مجالات وتخصصات العيادة لمنع الازدواجية.',
     morningSlots: 'الفترة الصباحية والظهيرة (11:00 – 14:00)',
     afternoonSlots: 'فترة بعد الظهر (14:00 – 18:00)',
     eveningSlots: 'الفترة المسائية (18:00 – 23:00)',
@@ -140,6 +144,10 @@ export const translations: Record<Language, Translations> = {
     selectDateFirst: 'يرجى تحديد اليوم أولاً لعرض الفترات الزمنية الشاغرة',
     slotBooked: 'محجوز',
     slotAvailable: 'متاح',
+    slotBookedAllDepts: 'محجوز (لكافة الأقسام)',
+    slotPassed: 'مضى وقته',
+    unifiedBookingNotice: 'نظام الحجز الموحد: أي ساعة يتم حجزها تُقفل تلقائياً لجميع مجالات وتخصصات العيادة لمنع التضارب أو تكرار الحجز.',
+    lockedAllDeptsTooltip: 'هذه الساعة محجوزة في العيادة وغير متاحة لأي قسم آخر',
 
     patientInfoHeading: 'معلومات المريض الأساسية',
     patientInfoSub: 'أدخل الاسم الأول واسم العائلة للتسجيل بدقة في ملف المراجعة',
@@ -216,7 +224,7 @@ export const translations: Record<Language, Translations> = {
     chooseDateSub: 'Takvimden size en uygun günü belirleyiniz (Mevcut ve ileri tarihler açıktır)',
     chooseTimeHeading: 'Randevu Saatini Seçiniz',
     chooseTimeSub: 'Kliniğimiz çalışma saatleri 11:00 - 23:00 arasındadır',
-    timeSlotNotice: 'Her bölümün randevu saatleri, sterilizasyon ve hekim planlamasına göre bağımsız yönetilmektedir.',
+    timeSlotNotice: 'Tekil Randevu Sistemi: Rezerve edilen saat, çakışmayı önlemek için kliniğin tüm uzmanlık alanlarına kapatılır.',
     morningSlots: 'Öğle Öncesi & Öğle (11:00 – 14:00)',
     afternoonSlots: 'Öğleden Sonra (14:00 – 18:00)',
     eveningSlots: 'Akşam Kuşağı (18:00 – 23:00)',
@@ -224,6 +232,10 @@ export const translations: Record<Language, Translations> = {
     selectDateFirst: 'Müsait saatleri görüntülemek için lütfen önce bir tarih seçiniz',
     slotBooked: 'Dolu',
     slotAvailable: 'Müsait',
+    slotBookedAllDepts: 'Tüm Bölümlere Dolu',
+    slotPassed: 'Süresi Geçti',
+    unifiedBookingNotice: 'Tekil Randevu Sistemi: Rezerve edilen saat, çakışmayı önlemek için kliniğin tüm uzmanlık alanlarına anında kapatılır.',
+    lockedAllDeptsTooltip: 'Bu saat klinikte rezerve edilmiştir ve hiçbir bölümde seçilemez',
 
     patientInfoHeading: 'Hasta İletişim Bilgileri',
     patientInfoSub: 'Kayıt ve karşılama için lütfen adınızı ve soyadınızı eksiksiz giriniz',
@@ -300,7 +312,7 @@ export const translations: Record<Language, Translations> = {
     chooseDateSub: 'Choose an available day from the interactive calendar',
     chooseTimeHeading: 'Select Appointment Time',
     chooseTimeSub: 'Strict clinic working hours are 11:00 AM to 11:00 PM',
-    timeSlotNotice: 'Each dental department operates independent appointment intervals and chair schedules.',
+    timeSlotNotice: 'Unified Booking: Any booked hour is locked clinic-wide across all departments to prevent overlaps.',
     morningSlots: 'Morning & Midday (11:00 AM – 2:00 PM)',
     afternoonSlots: 'Afternoon (2:00 PM – 6:00 PM)',
     eveningSlots: 'Evening (6:00 PM – 11:00 PM)',
@@ -308,6 +320,10 @@ export const translations: Record<Language, Translations> = {
     selectDateFirst: 'Please select a date first to view available time slots',
     slotBooked: 'Booked',
     slotAvailable: 'Available',
+    slotBookedAllDepts: 'Booked (All Depts)',
+    slotPassed: 'Passed',
+    unifiedBookingNotice: 'Unified Booking Lock: Once a time slot is reserved, it is instantly locked across all clinic departments.',
+    lockedAllDeptsTooltip: 'This time is booked clinic-wide and cannot be selected in any department',
 
     patientInfoHeading: 'Patient Information',
     patientInfoSub: 'Enter your First and Last Name for registration and medical records',

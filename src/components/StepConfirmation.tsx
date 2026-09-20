@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Department, Language, BookingData, WizardStep } from '../types';
 import { translations } from '../data/translations';
+import { recordClinicBooking } from '../data/departments';
 import {
   CheckCircle2,
   Calendar,
@@ -13,7 +14,8 @@ import {
   Check,
   RotateCcw,
   Edit3,
-  ShieldCheck
+  ShieldCheck,
+  Lock
 } from 'lucide-react';
 
 interface StepConfirmationProps {
@@ -86,8 +88,28 @@ export const StepConfirmation: React.FC<StepConfirmationProps> = ({
   const rawMessage = buildWhatsAppMessage();
   const whatsappUrl = `https://wa.me/${clinicPhoneRaw}?text=${encodeURIComponent(rawMessage)}`;
 
+  // Automatically lock this slot clinic-wide across all departments upon reaching confirmation
+  useEffect(() => {
+    if (bookingData.selectedDate && bookingData.selectedTime && department.id) {
+      recordClinicBooking({
+        departmentId: department.id,
+        selectedDate: bookingData.selectedDate,
+        selectedTime: bookingData.selectedTime,
+        patientName: patientFullName
+      });
+    }
+  }, [bookingData.selectedDate, bookingData.selectedTime, department.id, patientFullName]);
+
   const handleOpenWhatsApp = () => {
     setHasOpenedWhatsApp(true);
+    if (bookingData.selectedDate && bookingData.selectedTime && department.id) {
+      recordClinicBooking({
+        departmentId: department.id,
+        selectedDate: bookingData.selectedDate,
+        selectedTime: bookingData.selectedTime,
+        patientName: patientFullName
+      });
+    }
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -226,6 +248,16 @@ export const StepConfirmation: React.FC<StepConfirmationProps> = ({
                       <span className="inline-flex items-center gap-1 bg-sky-100 dark:bg-sky-900/60 text-sky-900 dark:text-sky-200 font-mono font-bold px-2.5 py-0.5 rounded-lg text-sm border border-sky-200 dark:border-sky-800">
                         <Clock className="w-3.5 h-3.5 text-sky-700 dark:text-sky-300" />
                         {bookingData.selectedTime}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800/60 w-fit">
+                      <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>
+                        {currentLang === 'ar'
+                          ? 'تم قفل هذا التوقيت في كافة أقسام ومجالات العيادة'
+                          : currentLang === 'tr'
+                          ? 'Bu saat tüm bölümlerde kilitlendi'
+                          : 'Locked across all clinic departments'}
                       </span>
                     </div>
                   </div>

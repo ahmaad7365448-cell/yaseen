@@ -14,6 +14,16 @@ export interface TimeSlot {
   time: string; // e.g. "11:00", "11:30"
   available: boolean;
   period: 'morning' | 'afternoon' | 'evening';
+  bookedReason?: 'past' | 'booked';
+}
+
+export interface ClinicBookingRecord {
+  id: string;
+  departmentId: string;
+  selectedDate: string; // YYYY-MM-DD
+  selectedTime: string; // HH:mm
+  patientName: string;
+  createdAt: string;
 }
 
 export interface BookingData {

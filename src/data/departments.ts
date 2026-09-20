@@ -1,4 +1,4 @@
-import { Department, TimeSlot } from '../types';
+import { Department, TimeSlot, ClinicBookingRecord } from '../types';
 
 export const DEPARTMENTS: Department[] = [
   {
@@ -129,71 +129,152 @@ export const DEPARTMENTS: Department[] = [
   }
 ];
 
+const CLINIC_BOOKINGS_STORAGE_KEY = 'clinic_universal_bookings_v2';
+
 /**
- * Generates independent department-specific time slots strictly between 11:00 and 23:00.
+ * Retrieves all stored clinic bookings from localStorage across all departments.
+ */
+export function getStoredClinicBookings(): ClinicBookingRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(CLINIC_BOOKINGS_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as ClinicBookingRecord[];
+  } catch (err) {
+    console.error('Failed to read clinic bookings from storage', err);
+    return [];
+  }
+}
+
+/**
+ * Records a new confirmed appointment into the universal clinic booking registry.
+ * This lock is applied clinic-wide across ALL departments.
+ */
+export function recordClinicBooking(booking: {
+  departmentId: string;
+  selectedDate: string;
+  selectedTime: string;
+  patientName: string;
+}): ClinicBookingRecord {
+  const current = getStoredClinicBookings();
+  const existingIndex = current.findIndex(
+    b => b.selectedDate === booking.selectedDate && b.selectedTime === booking.selectedTime
+  );
+
+  const newRecord: ClinicBookingRecord = {
+    id: `booking-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    departmentId: booking.departmentId,
+    selectedDate: booking.selectedDate,
+    selectedTime: booking.selectedTime,
+    patientName: booking.patientName,
+    createdAt: new Date().toISOString()
+  };
+
+  if (existingIndex >= 0) {
+    current[existingIndex] = newRecord;
+  } else {
+    current.push(newRecord);
+  }
+
+  try {
+    localStorage.setItem(CLINIC_BOOKINGS_STORAGE_KEY, JSON.stringify(current));
+    // Dispatch custom event to notify any open components
+    window.dispatchEvent(new CustomEvent('clinic-booking-updated', { detail: newRecord }));
+  } catch (err) {
+    console.error('Failed to write clinic booking to storage', err);
+  }
+
+  return newRecord;
+}
+
+/**
+ * Checks if a specific date and time slot is booked anywhere in the clinic.
+ * If booked in ANY department, returns isBooked: true so no department can pick it.
+ */
+export function isSlotBookedClinicWide(dateStr: string, timeStr: string): { isBooked: boolean; booking?: ClinicBookingRecord } {
+  const bookings = getStoredClinicBookings();
+  const found = bookings.find(b => b.selectedDate === dateStr && b.selectedTime === timeStr);
+  if (found) {
+    return { isBooked: true, booking: found };
+  }
+
+  return { isBooked: false };
+}
+
+/**
+ * Generates uniform, reliable time slots strictly between 11:00 and 23:00.
+ * Any booked slot is LOCKED CLINIC-WIDE across all departments and specialties.
  */
 export function getDepartmentTimeSlots(deptId: string, dateStr: string): TimeSlot[] {
-  const dept = DEPARTMENTS.find(d => d.id === deptId) || DEPARTMENTS[0];
   const slots: TimeSlot[] = [];
 
-  // Generate slots depending on department duration
-  let currentHour = 11;
-  let currentMinute = 0;
+  // Standardized clinic working hours: strictly 11:00 to 23:00 (every 30 minutes)
+  const startHour = 11;
   const endHour = 23;
 
-  // Pediatric closes slightly earlier at 21:00
-  const maxHour = dept.id === 'pediatric-dentistry' ? 21 : endHour;
-  const stepMinutes = dept.durationMinutes === 60 ? 60 : dept.durationMinutes === 45 ? 45 : dept.durationMinutes === 50 ? 50 : 30;
+  // Check today's date for past hours filtering
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const localTodayStr = `${year}-${month}-${day}`;
+  const isSelectedDateToday = dateStr === localTodayStr;
+  const isPastDate = dateStr < localTodayStr;
+  const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
 
-  let slotIndex = 0;
-  while (currentHour < maxHour || (currentHour === maxHour && currentMinute === 0)) {
-    // If end boundary reached, break
-    if (currentHour === maxHour && currentMinute > 0) break;
-    if (currentHour >= 23) break;
+  for (let hour = startHour; hour < endHour; hour++) {
+    for (let minute of [0, 30]) {
+      const hourStr = String(hour).padStart(2, '0');
+      const minStr = String(minute).padStart(2, '0');
+      const timeStr = `${hourStr}:${minStr}`;
 
-    const hourStr = String(currentHour).padStart(2, '0');
-    const minStr = String(currentMinute).padStart(2, '0');
-    const timeStr = `${hourStr}:${minStr}`;
+      // Categorize period
+      let period: 'morning' | 'afternoon' | 'evening' = 'morning';
+      if (hour >= 18) {
+        period = 'evening';
+      } else if (hour >= 14) {
+        period = 'afternoon';
+      }
 
-    // Categorize period
-    let period: 'morning' | 'afternoon' | 'evening' = 'morning';
-    if (currentHour >= 18) {
-      period = 'evening';
-    } else if (currentHour >= 14) {
-      period = 'afternoon';
+      // Check 1: If date is in the past
+      if (isPastDate) {
+        slots.push({
+          time: timeStr,
+          available: false,
+          period,
+          bookedReason: 'past'
+        });
+        continue;
+      }
+
+      // Check 2: If today, has this slot already passed?
+      const slotTotalMinutes = hour * 60 + minute;
+      const isPastToday = isSelectedDateToday && slotTotalMinutes <= currentTotalMinutes;
+
+      // Check 3: Universal clinic-wide booking (locked across all departments)
+      const clinicStatus = isSlotBookedClinicWide(dateStr, timeStr);
+
+      let available = true;
+      let bookedReason: 'past' | 'booked' | undefined = undefined;
+
+      if (isPastToday) {
+        available = false;
+        bookedReason = 'past';
+      } else if (clinicStatus.isBooked) {
+        available = false;
+        bookedReason = 'booked';
+      }
+
+      slots.push({
+        time: timeStr,
+        available,
+        period,
+        bookedReason
+      });
     }
-
-    // Deterministic booked slots simulation based on date + deptId + slot
-    // Structured appointment schedule: some slots are occupied, some are open
-    const hash = simpleHash(`${dateStr}-${dept.id}-${timeStr}`);
-    // ~25% booked rate, deterministic for repeatability
-    const isBooked = (hash % 100) < 26;
-
-    slots.push({
-      time: timeStr,
-      available: !isBooked,
-      period
-    });
-
-    // Advance time
-    currentMinute += stepMinutes;
-    if (currentMinute >= 60) {
-      currentHour += Math.floor(currentMinute / 60);
-      currentMinute = currentMinute % 60;
-    }
-    slotIndex++;
-    if (slotIndex > 30) break; // safety guard
   }
 
   return slots;
 }
 
-function simpleHash(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
+

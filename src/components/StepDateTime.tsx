@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Department, Language } from '../types';
 import { translations } from '../data/translations';
 import { getDepartmentTimeSlots } from '../data/departments';
@@ -11,7 +11,8 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Lock
 } from 'lucide-react';
 
 interface StepDateTimeProps {
@@ -103,11 +104,33 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
     return { firstDayIndex, days };
   }, [year, month, todayStr]);
 
-  // Generate department-specific slots for the selected date
+  // Listen for clinic booking storage updates so slots update reactively
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    const handleUpdate = () => setRefreshKey(k => k + 1);
+    window.addEventListener('clinic-booking-updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('clinic-booking-updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  // Generate department-specific slots for the selected date (unified clinic schedule)
   const slots = useMemo(() => {
     if (!selectedDate) return [];
     return getDepartmentTimeSlots(department.id, selectedDate);
-  }, [department.id, selectedDate]);
+  }, [department.id, selectedDate, refreshKey]);
+
+  // If a previously selected slot is no longer available (e.g. booked or past), reset it
+  useEffect(() => {
+    if (selectedTime && selectedDate && slots.length > 0) {
+      const match = slots.find(s => s.time === selectedTime);
+      if (!match || !match.available) {
+        onSelectTime('');
+      }
+    }
+  }, [slots, selectedTime, selectedDate, onSelectTime]);
 
   // Group slots into time periods
   const morningSlots = useMemo(() => slots.filter(s => s.period === 'morning'), [slots]);
@@ -120,7 +143,10 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
     for (let i = 0; i < 4; i++) {
       const d = new Date();
       d.setDate(d.getDate() + i);
-      const str = d.toISOString().split('T')[0];
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const str = `${y}-${m}-${day}`;
       const dayName = t.weekDays[d.getDay()];
       const monthName = t.months[d.getMonth()];
       const label =
@@ -289,7 +315,7 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
 
         {/* Right Column: Time Slots strictly 11:00 AM to 11:00 PM (6 cols on large) */}
         <div className="lg:col-span-6 bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4 transition-colors">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Clock className="w-4 h-4 text-sky-600 dark:text-sky-400" />
               <span>{t.chooseTimeHeading}</span>
@@ -302,10 +328,16 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
                 {t.slotAvailable}
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-700 inline-block" />
-                {t.slotBooked}
+                <Lock className="w-3 h-3 text-rose-500 dark:text-rose-400 shrink-0" />
+                {t.slotBookedAllDepts}
               </span>
             </div>
+          </div>
+
+          {/* Universal Booking Lock Notice */}
+          <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 flex items-start gap-2 text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed">
+            <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <span>{t.unifiedBookingNotice}</span>
           </div>
 
           {!selectedDate ? (
@@ -325,6 +357,8 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {morningSlots.map((slot) => {
                       const isSelected = selectedTime === slot.time;
+                      const isBooked = !slot.available && slot.bookedReason === 'booked';
+                      const isPast = !slot.available && slot.bookedReason === 'past';
                       return (
                         <button
                           key={slot.time}
@@ -332,15 +366,27 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
                           id={`slot-btn-${slot.time.replace(':', '-')}`}
                           disabled={!slot.available}
                           onClick={() => onSelectTime(slot.time)}
-                          className={`py-2 px-2.5 rounded-xl text-xs font-semibold text-center transition-all border ${
+                          title={
+                            isBooked
+                              ? t.lockedAllDeptsTooltip
+                              : isPast
+                              ? t.slotPassed
+                              : `${slot.time} - ${t.slotAvailable}`
+                          }
+                          className={`py-2 px-2.5 rounded-xl text-xs font-semibold text-center transition-all border flex items-center justify-center gap-1.5 ${
                             isSelected
                               ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-md shadow-sky-600/20'
-                              : !slot.available
-                              ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-600 border-slate-200/60 dark:border-slate-800 line-through cursor-not-allowed opacity-60'
+                              : isBooked
+                              ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border-slate-200/80 dark:border-slate-800 cursor-not-allowed opacity-75'
+                              : isPast
+                              ? 'bg-slate-100/60 dark:bg-slate-800/30 text-slate-400 dark:text-slate-600 border-dashed border-slate-200 dark:border-slate-800 line-through cursor-not-allowed opacity-50'
                               : 'bg-white dark:bg-slate-800 hover:border-sky-400 dark:hover:border-sky-500 hover:bg-sky-50/50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs'
                           }`}
                         >
                           <span className="font-mono">{slot.time}</span>
+                          {isBooked && (
+                            <Lock className="w-3 h-3 text-rose-500 dark:text-rose-400 shrink-0" />
+                          )}
                         </button>
                       );
                     })}
@@ -358,6 +404,8 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {afternoonSlots.map((slot) => {
                       const isSelected = selectedTime === slot.time;
+                      const isBooked = !slot.available && slot.bookedReason === 'booked';
+                      const isPast = !slot.available && slot.bookedReason === 'past';
                       return (
                         <button
                           key={slot.time}
@@ -365,15 +413,27 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
                           id={`slot-btn-${slot.time.replace(':', '-')}`}
                           disabled={!slot.available}
                           onClick={() => onSelectTime(slot.time)}
-                          className={`py-2 px-2.5 rounded-xl text-xs font-semibold text-center transition-all border ${
+                          title={
+                            isBooked
+                              ? t.lockedAllDeptsTooltip
+                              : isPast
+                              ? t.slotPassed
+                              : `${slot.time} - ${t.slotAvailable}`
+                          }
+                          className={`py-2 px-2.5 rounded-xl text-xs font-semibold text-center transition-all border flex items-center justify-center gap-1.5 ${
                             isSelected
                               ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-md shadow-sky-600/20'
-                              : !slot.available
-                              ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-600 border-slate-200/60 dark:border-slate-800 line-through cursor-not-allowed opacity-60'
+                              : isBooked
+                              ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border-slate-200/80 dark:border-slate-800 cursor-not-allowed opacity-75'
+                              : isPast
+                              ? 'bg-slate-100/60 dark:bg-slate-800/30 text-slate-400 dark:text-slate-600 border-dashed border-slate-200 dark:border-slate-800 line-through cursor-not-allowed opacity-50'
                               : 'bg-white dark:bg-slate-800 hover:border-sky-400 dark:hover:border-sky-500 hover:bg-sky-50/50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs'
                           }`}
                         >
                           <span className="font-mono">{slot.time}</span>
+                          {isBooked && (
+                            <Lock className="w-3 h-3 text-rose-500 dark:text-rose-400 shrink-0" />
+                          )}
                         </button>
                       );
                     })}
@@ -391,6 +451,8 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {eveningSlots.map((slot) => {
                       const isSelected = selectedTime === slot.time;
+                      const isBooked = !slot.available && slot.bookedReason === 'booked';
+                      const isPast = !slot.available && slot.bookedReason === 'past';
                       return (
                         <button
                           key={slot.time}
@@ -398,15 +460,27 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
                           id={`slot-btn-${slot.time.replace(':', '-')}`}
                           disabled={!slot.available}
                           onClick={() => onSelectTime(slot.time)}
-                          className={`py-2 px-2.5 rounded-xl text-xs font-semibold text-center transition-all border ${
+                          title={
+                            isBooked
+                              ? t.lockedAllDeptsTooltip
+                              : isPast
+                              ? t.slotPassed
+                              : `${slot.time} - ${t.slotAvailable}`
+                          }
+                          className={`py-2 px-2.5 rounded-xl text-xs font-semibold text-center transition-all border flex items-center justify-center gap-1.5 ${
                             isSelected
                               ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-md shadow-sky-600/20'
-                              : !slot.available
-                              ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-600 border-slate-200/60 dark:border-slate-800 line-through cursor-not-allowed opacity-60'
+                              : isBooked
+                              ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border-slate-200/80 dark:border-slate-800 cursor-not-allowed opacity-75'
+                              : isPast
+                              ? 'bg-slate-100/60 dark:bg-slate-800/30 text-slate-400 dark:text-slate-600 border-dashed border-slate-200 dark:border-slate-800 line-through cursor-not-allowed opacity-50'
                               : 'bg-white dark:bg-slate-800 hover:border-sky-400 dark:hover:border-sky-500 hover:bg-sky-50/50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs'
                           }`}
                         >
                           <span className="font-mono">{slot.time}</span>
+                          {isBooked && (
+                            <Lock className="w-3 h-3 text-rose-500 dark:text-rose-400 shrink-0" />
+                          )}
                         </button>
                       );
                     })}
