@@ -1,0 +1,6 @@
+{
+  "name": "Dr. Yassin Al-Hashimi Dental Clinic",
+  "description": "Online dental appointment booking system for Dr. Yassin Al-Hashimi Dental Clinic in Bursa, Turkey with multi-language support and WhatsApp booking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
