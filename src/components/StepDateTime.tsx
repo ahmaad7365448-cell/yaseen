@@ -334,12 +334,6 @@ export const StepDateTime: React.FC<StepDateTimeProps> = ({
             </div>
           </div>
 
-          {/* Universal Booking Lock Notice */}
-          <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 flex items-start gap-2 text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed">
-            <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <span>{t.unifiedBookingNotice}</span>
-          </div>
-
           {!selectedDate ? (
             <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 text-xs">
               <CalendarIcon className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
